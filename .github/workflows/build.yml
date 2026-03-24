@@ -10,12 +10,32 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Setup Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+          cache: true # 确保开启官方缓存机制
 
       - name: Build
         run: make build-all
+
+      # --- 自动导出逻辑 ---
+      - name: Prepare Cache for Download
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          # 获取 Go 模块缓存路径
+          GOCACHE_PATH=$(go env GOMODCACHE)
+          echo "Exporting from: $GOCACHE_PATH"
+          # 创建导出目录并拷贝文件
+          mkdir -p ./export_download
+          cp -r $GOCACHE_PATH/. ./export_download/ || true
+
+      - name: Upload Cache as Artifact
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: go-cache-export
+          path: ./export_download
+          retention-days: 1 # 临时保存 1 天
