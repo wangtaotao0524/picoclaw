@@ -174,7 +174,7 @@ build-windows-amd64: generate
 		fi \
 	fi
 	# 确保 Launcher 也加上 .exe 后缀
-	GOOS=windows GOARCH=amd64 $(WEB_GO) $(GOFLAGS) -o $(BUILD_DIR)/picoclaw-launcher-windows-amd64.exe ./web/backend
+	GOOS=windows GOARCH=amd64 $(WEB_GO) build $(GOFLAGS) -o $(BUILD_DIR)/picoclaw-launcher-windows-amd64.exe ./web/backend
 	@echo "Build complete: $(BUILD_DIR)/picoclaw-launcher-windows-amd64.exe"
 
 ## build-linux-mipsle: Build for Linux MIPS32 LE
