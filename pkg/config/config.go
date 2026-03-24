@@ -106,6 +106,7 @@ func (c *Config) WithSecurity(sec *SecurityConfig) *Config {
 		c.security = sec
 		return c
 	}
+	sec = normalizeSecurityConfig(sec)
 	err := applySecurityConfig(c, sec)
 	if err != nil {
 		return nil
@@ -814,6 +815,7 @@ func (c *WeComAIBotConfig) SetSecret(secret string) {
 type WeixinConfig struct {
 	Enabled            bool `json:"enabled"              env:"PICOCLAW_CHANNELS_WEIXIN_ENABLED"`
 	token              string
+	AccountID          string              `json:"account_id,omitempty" env:"PICOCLAW_CHANNELS_WEIXIN_ACCOUNT_ID"`
 	BaseURL            string              `json:"base_url"             env:"PICOCLAW_CHANNELS_WEIXIN_BASE_URL"`
 	CDNBaseURL         string              `json:"cdn_base_url"         env:"PICOCLAW_CHANNELS_WEIXIN_CDN_BASE_URL"`
 	Proxy              string              `json:"proxy"                env:"PICOCLAW_CHANNELS_WEIXIN_PROXY"`
@@ -1393,6 +1395,18 @@ func LoadConfig(path string) (*Config, error) {
 		if err != nil {
 			return nil, err
 		}
+		// Load existing security config and merge with migrated one to prevent data loss
+		existingSec, secErr := loadSecurityConfig(securityPath(path))
+		if secErr != nil {
+			logger.WarnF("failed to load existing security config during migration", map[string]any{"error": secErr})
+		}
+		if existingSec != nil && cfg.security != nil {
+			cfg.security = mergeSecurityConfig(existingSec, cfg.security)
+			// Re-apply the merged security config to update all channels and models
+			if err = applySecurityConfig(cfg, cfg.security); err != nil {
+				logger.WarnF("failed to re-apply merged security config during migration", map[string]any{"error": err})
+			}
+		}
 		defer func(cfg *Config) {
 			_ = SaveConfig(path, cfg)
 		}(cfg)
@@ -1768,6 +1782,7 @@ func SaveConfig(path string, cfg *Config) error {
 		logger.ErrorC("config", "security is nil")
 		return fmt.Errorf("security is nil")
 	}
+	cfg.security = normalizeSecurityConfig(cfg.security)
 	// Ensure version is always set when saving
 	if cfg.Version == 0 {
 		cfg.Version = CurrentVersion
@@ -1946,6 +1961,7 @@ func SaveConfig(path string, cfg *Config) error {
 	if err != nil {
 		return err
 	}
+	logger.Infof("saving config to %s", path)
 	return fileutil.WriteFileAtomic(path, data, 0o600)
 }
 
@@ -2009,6 +2025,17 @@ func (c *Config) ValidateModelList() error {
 
 func (c *Config) SecurityCopyFrom(cfg *Config) {
 	c.security = cfg.security
+	if c.security != nil {
+		if err := applySecurityConfig(c, c.security); err != nil {
+			logger.Errorf("failed to apply security config in SecurityCopyFrom: %v", err)
+		}
+	}
+}
+
+// ApplySecurity re-applies the stored security config to populate private fields (tokens, API keys, etc.).
+// Call this after SecurityCopyFrom when you need private fields to be accessible for validation or use.
+func (c *Config) ApplySecurity() error {
+	return applySecurityConfig(c, c.security)
 }
 
 func MergeAPIKeys(apiKey string, apiKeys []string) []string {
