@@ -19,7 +19,7 @@ jobs:
           cache: true
 
       - name: Build
-        run: make build-all
+        run: make build-windows-amd64
         
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v6
