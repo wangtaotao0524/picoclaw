@@ -157,6 +157,26 @@ build-linux-arm64: generate
 	GOOS=linux GOARCH=arm64 $(GO) build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(BINARY_NAME)-linux-arm64 ./$(CMD_DIR)
 	@echo "Build complete: $(BUILD_DIR)/$(BINARY_NAME)-linux-arm64"
 
+build-windows-amd64: generate
+	@echo "Building for windows/amd64..."
+	@mkdir -p $(BUILD_DIR)
+	# 增加 -ldflags 确保版本信息正确，并保持 CGO_ENABLED=0
+	GOOS=windows GOARCH=amd64 $(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(BINARY_NAME)-windows-amd64.exe ./$(CMD_DIR)
+	@echo "Build complete: $(BUILD_DIR)/$(BINARY_NAME)-windows-amd64.exe"
+	
+	@echo "Building picoclaw-launcher for windows/amd64..."
+	@if [ ! -f web/backend/dist/index.html ]; then \
+		echo "Building frontend..."; \
+		if command -v pnpm >/dev/null 2>&1; then \
+			cd web/frontend && pnpm install && pnpm build:backend; \
+		else \
+			echo "Error: pnpm not found, skip frontend build"; exit 1; \
+		fi \
+	fi
+	# 确保 Launcher 也加上 .exe 后缀
+	GOOS=windows GOARCH=amd64 $(WEB_GO) $(GOFLAGS) -o $(BUILD_DIR)/picoclaw-launcher-windows-amd64.exe ./web/backend
+	@echo "Build complete: $(BUILD_DIR)/picoclaw-launcher-windows-amd64.exe"
+
 ## build-linux-mipsle: Build for Linux MIPS32 LE
 build-linux-mipsle: generate
 	@echo "Building for linux/mipsle (softfloat)..."
